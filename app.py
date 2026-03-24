@@ -1,10 +1,10 @@
 """
-AI ChatBot - Claude API 智能对话助手
-基于 Streamlit 和 Anthropic Claude API 构建
+AI ChatBot - 智谱 AI GLM-4 智能对话助手
+基于 Streamlit 和智谱 AI 大模型构建
 """
 
 import streamlit as st
-import anthropic
+import requests
 from dotenv import load_dotenv
 import os
 import uuid
@@ -14,29 +14,49 @@ load_dotenv()
 
 
 class ChatBot:
-    """Claude 智能对话助手"""
+    """智谱 AI 智能对话助手"""
 
     def __init__(self):
-        self.client = None
-        self.model = "claude-sonnet-4-20250514"
-        self.max_tokens = 4096
+        self.api_key = None
+        self.model = "glm-4-flash"  # 免费模型，有一定额度
+        self.api_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
     def init_client(self, api_key: str):
-        """初始化 Anthropic 客户端"""
-        self.client = anthropic.Anthropic(api_key=api_key)
+        """初始化客户端"""
+        self.api_key = api_key
 
     def generate_response(self, messages: list) -> str:
         """生成回复"""
-        if not self.client:
+        if not self.api_key:
             return "请先输入 API Key"
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                messages=messages
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            data = {
+                "model": self.model,
+                "messages": messages
+            }
+
+            response = requests.post(
+                self.api_url,
+                headers=headers,
+                json=data,
+                timeout=60
             )
-            return response.content[0].text
+
+            if response.status_code == 200:
+                result = response.json()
+                return result["choices"][0]["message"]["content"]
+            else:
+                error_msg = response.json().get("error", {}).get("message", "未知错误")
+                return f"API 错误: {error_msg}"
+
+        except requests.exceptions.Timeout:
+            return "请求超时，请重试"
         except Exception as e:
             return f"发生错误: {str(e)}"
 
@@ -65,7 +85,7 @@ def render_sidebar():
             "API Key",
             type="password",
             value="",
-            help="输入你的 Anthropic API Key"
+            help="输入你的智谱 AI API Key"
         )
 
         if api_key:
@@ -77,10 +97,21 @@ def render_sidebar():
 
         st.subheader("💡 使用提示")
         st.markdown("""
-        1. 首先输入你的 API Key
-        2. 在下方输入问题
-        3. 按 Enter 或点击发送
+        1. 首先获取智谱 AI API Key
+        2. 输入 API Key 并确认
+        3. 在下方输入问题开始对话
         """)
+
+        st.divider()
+
+        st.subheader("📝 如何获取 API Key")
+        st.markdown("""
+        1. 访问 [智谱 AI 开放平台](https://open.bigmodel.cn/)
+        2. 注册并登录账号
+        3. 进入控制台 -> API Key 管理
+        4. 创建新 Key 并复制
+        """)
+        st.caption("新用户有免费额度赠送")
 
         st.divider()
 
@@ -90,7 +121,7 @@ def render_sidebar():
 
         st.divider()
 
-        st.caption("Powered by Claude 3.5 Sonnet")
+        st.caption("Powered by 智谱 AI GLM-4")
 
 
 def render_chat_history():
@@ -125,13 +156,6 @@ def handle_user_input():
 
             st.markdown(response)
 
-            col1, col2 = st.columns([1, 5])
-            with col1:
-                if st.button("📋 复制", key=f"copy_{len(st.session_state.messages)}"):
-                    import pyperclip
-                    pyperclip.copy(response)
-                    st.toast("已复制到剪贴板")
-
         assistant_message = {"role": "assistant", "content": response}
         st.session_state.messages.append(assistant_message)
 
@@ -139,14 +163,14 @@ def handle_user_input():
 def main():
     """主函数"""
     st.set_page_config(
-        page_title="Claude AI 助手",
+        page_title="智谱 AI 助手",
         page_icon="🤖",
         layout="wide",
         initial_sidebar_state="expanded"
     )
 
-    st.title("🤖 Claude AI 助手")
-    st.markdown("基于 Claude 3.5 Sonnet 的智能对话机器人")
+    st.title("🤖 智谱 AI 助手")
+    st.markdown("基于 GLM-4 的智能对话机器人，支持中文问答")
 
     initialize_session_state()
     render_sidebar()
